@@ -158,8 +158,9 @@ void blank_background() {
 	rcc_draw(0, 0, HOR_RES, VER_RES);
 }
 
+/* 2^15 / 0x4A =~ 442Hz =~ A440? */
 void config_timer() {
-	PR1 = 0x800;
+	PR1 = 0x4A;
 	_T1IP = 5;	 //set interrupt priority
 	T1CON = 0b1000000000000000;	//turn on the timer
 	_T1IF = 0;	 //reset interrupt flag
@@ -203,8 +204,8 @@ const unsigned char sinetable[] = {
 void __attribute__((__interrupt__)) _T1Interrupt(void);
 void __attribute__((__interrupt__, auto_psv)) _T1Interrupt(void)
 {
-	static unsigned short idx = 0;
-	PORTB += sinetable[idx >>8] << 8;
+	static unsigned char idx = 0;
+	PORTB = sinetable[idx] << 8;
 	idx += 1;
 	_T1IF = 0;
 }
