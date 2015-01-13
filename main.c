@@ -158,13 +158,13 @@ void blank_background() {
 	rcc_draw(0, 0, HOR_RES, VER_RES);
 }
 
-/* 2^15 / 0x4A =~ 442Hz =~ A440? */
+/* For close to A440: 16Mhz / (440Hz*256 samples) =~ 0x8E */
 void config_timer() {
-	PR1 = 0x4A;
-	_T1IP = 5;	 //set interrupt priority
-	T1CON = 0b1000000000000000;	//turn on the timer
-	_T1IF = 0;	 //reset interrupt flag
-	_T1IE = 1;	 //turn on the timer1 interrupt
+	PR1 = 0x8E;
+	_T1IP = 5;	// set interrupt priority
+	_TON  = 1;	// turn on the timer
+	_T1IF = 0;	// reset interrupt flag
+	_T1IE = 1;	// turn on the timer1 interrupt
 }
 const unsigned char sinetable[] = {
 0x80,0x83,0x86,0x89,0x8c,0x8f,0x92,0x95,
