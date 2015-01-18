@@ -302,8 +302,9 @@ int main(void) {
 	config_timer();
 
 	blank_background();
-	__delay_ms(1);
+	while(!_CMDMPT) continue; // Wait for GPU to finish drawing
 	ipu_decomp(gfx_compressed, GFXDisplayBuffer, GFX_BUFFER_SIZE);
+	while(!_CMDMPT) continue; // Wait for GPU to finish drawing
 	chr_print("Hello\nHello\nHello\nHello\n");
 	char buf[20];
 	sprintf(buf, "%x\n", G1IPU);
