@@ -1,4 +1,4 @@
-uint8_t FontStart[] __attribute__((space(eds) section("FONTS"))) = {
+__eds__ uint8_t FontStart[] __attribute__((space(eds) section("FONTS"))) = {
 	// classic 8x6 bitmapped font
 	0x00, 0x00,
 	0x00, 0x00,	// first char

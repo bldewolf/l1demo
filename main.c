@@ -5,6 +5,7 @@
 #include <string.h>
 #include "fonts.h"
 #include "music.h"
+#include "testgfx.h"
 
 #define  FCY    16000000UL    // Instruction cycle frequency, Hz
 #include <libpic30.h>
@@ -13,15 +14,42 @@ _CONFIG1(FWDTEN_OFF & GWRP_OFF & GCP_OFF & JTAGEN_OFF)
 _CONFIG2(POSCMOD_HS & FCKSM_CSDCMD & FNOSC_PRIPLL & PLL96MHZ_ON & PLLDIV_DIV2)
 _CONFIG3(ALTPMP_ALTPMPEN & SOSCSEL_EC)
 
-#define HOR_RES 640UL
+/*
+   To change resolutions, use an X modeline generator like:
+   http://xtiming.sourceforge.net/cgi-bin/xtiming.pl
+   For example, 80x480@60Hz produces
+   Modeline "80x480@61" 4.93 80 112 128 160 480 490 495 505
+   Then we convert it to the values we need:
+
+   4.93 is the pixel clock in MHz, we need to set CLOCKDIV to match.  To pick a
+   divisor, use page 147 of the data sheet or, uh, this perl one-liner to
+   generate all of them and pick one that's close:
+   perl -e '$d = 1;  $x = 0; while($x < 128) { printf "%s %.2f\n",$x,96/$d;if($x < 64) { $d += 0.25; } elsif($x < 96) { $d += 0.50 } else { $d += 1 }; $x++}'
+
+   The differences between: 80 112 128 160 480
+   are H-porch, H-Pulse, H-width
+   The differences between: 480 490 495 505
+   are V-porch, V-Pulse, V-width
+
+   Once these values are in, the monitor will display it but it will probably
+   be misaligned (especially vertically).  Play with VENST_FUDGE and
+   HENST_FUDGE to fix this.
+*/
+
+#define HOR_RES 80UL
 #define VER_RES 480UL
-#define HOR_FRONT_PORCH 16
-#define HOR_PULSE_WIDTH  96
-#define HOR_BACK_PORCH 48
-#define VER_FRONT_PORCH 11
-#define VER_PULSE_WIDTH 2
-#define VER_BACK_PORCH 31
+#define HOR_FRONT_PORCH 32
+#define HOR_PULSE_WIDTH 16
+#define HOR_BACK_PORCH  32
+#define VER_FRONT_PORCH 10
+#define VER_PULSE_WIDTH 5
+#define VER_BACK_PORCH  10
 #define BPP 2
+#define CLOCKDIV 69
+#define VENST_FUDGE 1
+#define HENST_FUDGE 0
+#define VSPOL 0 /* sync polarities */
+#define HSPOL 0
 
 #define CHR_FGCOLOR		0x5000
 #define CHR_BGCOLOR		0x5100
@@ -35,20 +63,23 @@ _CONFIG3(ALTPMP_ALTPMPEN & SOSCSEL_EC)
 #define RCC_RECTSIZE	 	0x6400
 #define RCC_COLOR	 	0x6600
 #define RCC_STARTCOPY	 	0x6700
+#define IPU_SRCADDR		0x7100
+#define IPU_DESTADDR	 	0x7200
+#define IPU_DECOMPRESS	 	0x7400
 
 #define GFX_BUFFER_SIZE (HOR_RES * VER_RES / (8/BPP))
 __eds__ uint8_t GFXDisplayBuffer[GFX_BUFFER_SIZE] __attribute__((eds, section("DISPLAY"), address(0x1000)));
 
 void config_graphics(void) {
 	_G1CLKSEL = 1;
-	_GCLKDIV = 11;
+	_GCLKDIV = CLOCKDIV;
 
 	G1DPADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1DPADRH = 0;
+	G1DPADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
 	G1W1ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W1ADRH = 0;
+	G1W1ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
 	G1W2ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W2ADRH = 0;
+	G1W2ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
 
 	_GDBEN = 0xFFFF;
 
@@ -62,12 +93,12 @@ void config_graphics(void) {
 	_DPCLKPOL = 0;
 	_DPENOE = 0;
 	_DPENPOL = 0;
-	_DPVSOE = 1;      /* use VSYNC */
-	_DPHSOE = 1;      /* use HSYNC */
-	_DPVSPOL = 0;     /* VSYNC negative polarity */
-	_DPHSPOL = 0;     /* HSYNC negative polarity */
-	_ACTLINE = _VENST = VER_FRONT_PORCH + VER_PULSE_WIDTH + VER_BACK_PORCH;
-	_ACTPIX = _HENST = HOR_FRONT_PORCH + HOR_PULSE_WIDTH + HOR_BACK_PORCH;
+	_DPVSOE = 1;
+	_DPHSOE = 1;
+	_DPVSPOL = VSPOL;
+	_DPHSPOL = HSPOL;
+	_ACTLINE = _VENST = VER_FRONT_PORCH + VER_PULSE_WIDTH + VER_BACK_PORCH - VENST_FUDGE;
+	_ACTPIX = _HENST = HOR_FRONT_PORCH + HOR_PULSE_WIDTH + HOR_BACK_PORCH - HENST_FUDGE;
 	_VSST = VER_FRONT_PORCH;
 	_HSST = HOR_FRONT_PORCH;
 	_VSLEN = VER_PULSE_WIDTH;
@@ -78,7 +109,7 @@ void config_graphics(void) {
 	_DPBPP = _PUBPP = BPP / 2;
 
 
-//	_DPTEST = 2;
+//	_DPTEST = 2; /* Uncomment for test patterns */
 
 	_G1EN = 1;
 	__delay_ms(1);
@@ -96,8 +127,8 @@ void config_chr(void) {
 	Nop();
 
 	while(_CMDFUL) continue;
-	G1CMDL = (uint16_t)(FontStart) & 0xFFFF;
-	G1CMDH = CHR_FONTBASE;
+	G1CMDL = (unsigned long)(FontStart) & 0xFFFF;
+	G1CMDH = CHR_FONTBASE | (unsigned long)(FontStart) >> 16;
 	Nop();
 
 	while(_CMDFUL) continue;
@@ -112,6 +143,9 @@ void config_chr(void) {
 }
 
 void chr_print(char *c) {
+	G1W1ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
+	G1W1ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
+
 	while(_CMDFUL) continue;
 	G1CMDL = 0;
 	G1CMDH = CHR_PRINTPOS;
@@ -135,6 +169,11 @@ void rcc_color(char color) {
 }
 
 void rcc_draw(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+	G1W1ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
+	G1W1ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
+	G1W2ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
+	G1W2ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
+
 	// destination
 	while(_CMDFUL) continue;
 	G1CMDL = x + y*HOR_RES;
@@ -157,6 +196,31 @@ void rcc_draw(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 void blank_background() {
 	rcc_color(0);
 	rcc_draw(0, 0, HOR_RES, VER_RES);
+}
+
+void ipu_decomp(__eds__ uint8_t *src, __eds__ uint8_t *dst, unsigned long size) {
+	G1W1ADRL = (unsigned long)(src) & 0xFFFF;
+	G1W1ADRH = (unsigned long)(src) >>16 & 0xFF;
+	G1W2ADRL = (unsigned long)(dst) & 0xFFFF;
+	G1W2ADRH = (unsigned long)(dst) >>16 & 0xFF;
+
+	// source addr
+	while(_CMDFUL) continue;
+	G1CMDL = 0;
+	G1CMDH = IPU_SRCADDR;
+	Nop();
+
+	// dest addr
+	while(_CMDFUL) continue;
+	G1CMDL = 0;
+	G1CMDH = IPU_DESTADDR;
+	Nop();
+
+	// dest addr
+	while(_CMDFUL) continue;
+	G1CMDL = size & 0xFFFF;
+	G1CMDH = IPU_DECOMPRESS	| (size >> 16);
+	Nop();
 }
 
 /* In-A-Gadda-Da-Vida Tab
@@ -238,13 +302,20 @@ int main(void) {
 	config_timer();
 
 	blank_background();
-	chr_print("Hello");
+	__delay_ms(1);
+	ipu_decomp(gfx_compressed, GFXDisplayBuffer, GFX_BUFFER_SIZE);
+	chr_print("Hello\nHello\nHello\nHello\n");
+	char buf[20];
+	sprintf(buf, "%x\n", G1IPU);
+	chr_print(buf);
+	rcc_draw(79, 0, 1, 480); /* Weird things occur if the right column isn't 0 */
 
 	uint8_t c = 0;
 	while (1) {
 		rcc_color(c++ % 4);
-		rcc_draw(100, 0, 200, 200);
+		rcc_draw(20, 0, 20, 200);
 //		rcc_draw(0, 0, HOR_RES, VER_RES);
+//		rcc_draw(638, 0, 1, 200);
 		__delay_ms(1000);
 	}
 
