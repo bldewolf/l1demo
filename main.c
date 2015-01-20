@@ -74,12 +74,12 @@ void config_graphics(void) {
 	_G1CLKSEL = 1;
 	_GCLKDIV = CLOCKDIV;
 
-	G1DPADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1DPADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
-	G1W1ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W1ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
-	G1W2ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W2ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
+	G1DPADRL = (unsigned long)(GFXDisplayBuffer);
+	G1DPADRH = (unsigned long)(GFXDisplayBuffer);
+	G1W1ADRL = (unsigned long)(GFXDisplayBuffer);
+	G1W1ADRH = (unsigned long)(GFXDisplayBuffer);
+	G1W2ADRL = (unsigned long)(GFXDisplayBuffer);
+	G1W2ADRH = (unsigned long)(GFXDisplayBuffer);
 
 	_GDBEN = 0xFFFF;
 
@@ -143,8 +143,8 @@ void config_chr(void) {
 }
 
 void chr_print(char *c) {
-	G1W1ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W1ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
+	G1W1ADRL = (unsigned long)(GFXDisplayBuffer);
+	G1W1ADRH = (unsigned long)(GFXDisplayBuffer);
 
 	while(_CMDFUL) continue;
 	G1CMDL = 0;
@@ -169,10 +169,10 @@ void rcc_color(char color) {
 }
 
 void rcc_draw(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
-	G1W1ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W1ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
-	G1W2ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W2ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
+	G1W1ADRL = (unsigned long)(GFXDisplayBuffer);
+	G1W1ADRH = (unsigned long)(GFXDisplayBuffer);
+	G1W2ADRL = (unsigned long)(GFXDisplayBuffer);
+	G1W2ADRH = (unsigned long)(GFXDisplayBuffer);
 
 	// destination
 	while(_CMDFUL) continue;
@@ -199,10 +199,10 @@ void blank_background() {
 }
 
 void ipu_decomp(__eds__ uint8_t *src, __eds__ uint8_t *dst, unsigned long size) {
-	G1W1ADRL = (unsigned long)(src) & 0xFFFF;
-	G1W1ADRH = (unsigned long)(src) >>16 & 0xFF;
-	G1W2ADRL = (unsigned long)(dst) & 0xFFFF;
-	G1W2ADRH = (unsigned long)(dst) >>16 & 0xFF;
+	G1W1ADRL = (unsigned long)(src);
+	G1W1ADRH = (unsigned long)(src);
+	G1W2ADRL = (unsigned long)(dst);
+	G1W2ADRH = (unsigned long)(dst);
 
 	// source addr
 	while(_CMDFUL) continue;
