@@ -66,18 +66,18 @@ _CONFIG3(ALTPMP_ALTPMPEN & SOSCSEL_EC)
 #define IPU_DECOMPRESS	 	0x7400
 
 #define GFX_BUFFER_SIZE (HOR_RES * VER_RES / (8/BPP))
-__eds__ uint8_t GFXDisplayBuffer[2][GFX_BUFFER_SIZE] __attribute__((eds, section("DISPLAY"), address(0x1000)));
+__eds__ uint8_t GFXDisplayBuffer[2][GFX_BUFFER_SIZE] __attribute__((eds, section("DISPLAY")));
 
 void config_graphics(void) {
 	_G1CLKSEL = 1;
 	_GCLKDIV = CLOCKDIV;
 
-	G1DPADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1DPADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
-	G1W1ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W1ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
-	G1W2ADRL = (unsigned long)(GFXDisplayBuffer) & 0xFFFF;
-	G1W2ADRH = (unsigned long)(GFXDisplayBuffer) >>16 & 0xFF;
+	G1DPADRL = (unsigned long)(GFXDisplayBuffer);
+	G1DPADRH = (unsigned long)(GFXDisplayBuffer);
+	G1W1ADRL = (unsigned long)(GFXDisplayBuffer);
+	G1W1ADRH = (unsigned long)(GFXDisplayBuffer);
+	G1W2ADRL = (unsigned long)(GFXDisplayBuffer);
+	G1W2ADRH = (unsigned long)(GFXDisplayBuffer);
 
 	_GDBEN = 0xFFFF;
 
@@ -156,27 +156,6 @@ void blank_background() {
 	rcc_draw(0, 0, HOR_RES, VER_RES);
 }
 
-volatile int fb_ready = 0;
-void __attribute__((interrupt, auto_psv))_GFX1Interrupt(void) {
-	static int lines = 0;
-	static int syncs = 0;
-	static int next_fb = 1;
-	if(_VMRGNIF) { /* on a vertical sync, flip buffers if it's ready */
-		lines = 0;
-		syncs++;
-		if(fb_ready) {
-			gpu_setfb(GFXDisplayBuffer[next_fb]);
-			next_fb = !next_fb;
-		}
-		fb_ready = 0;
-		_VMRGNIF = 0;
-	} else if(_HMRGNIF) { /* on each horizontal sync, ...? */
-		lines++;
-		_HMRGNIF = 0;
-	}
-	_GFX1IF = 0;
-}
-
 int main(void) {
 	int x;
 	//OSCCON = 0x0000;
@@ -198,18 +177,13 @@ int main(void) {
 	rcc_setdest(GFXDisplayBuffer[1]);
 	blank_background();
 
-
-	_VMRGNIF = 0;
-	_HMRGNIF = 0;
-	_HMRGNIE = 1;
+	/* enable vertical blanking interrupts so _VMRGNIF works */
 	_VMRGNIE = 1;
-	_GFX1IE = 1;
 
 	int sweep = 0;
 	int next_fb = 1;
 	while (1) {
 		rcc_setdest(GFXDisplayBuffer[next_fb]);
-		next_fb = !next_fb;
 
 		blank_background();
 		rcc_color(0xFFFF);
@@ -217,8 +191,10 @@ int main(void) {
 		sweep++;
 		if(sweep == HOR_RES - 1) sweep = 0;
 		while(!_CMDMPT) continue; // Wait for GPU to finish drawing
-		fb_ready = 1;
-		while(fb_ready) continue; // wait for gfx interrupt to flip
+		_VMRGNIF = 0;
+		while(!_VMRGNIF) continue; // wait for vsync
+		gpu_setfb(GFXDisplayBuffer[next_fb]);
+		next_fb = !next_fb;
 	}
 
 	return 0;
