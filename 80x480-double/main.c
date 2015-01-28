@@ -191,9 +191,9 @@ int main(void) {
 		sweep++;
 		if(sweep == HOR_RES - 1) sweep = 0;
 		while(!_CMDMPT) continue; // Wait for GPU to finish drawing
+		gpu_setfb(GFXDisplayBuffer[next_fb]);
 		_VMRGNIF = 0;
 		while(!_VMRGNIF) continue; // wait for vsync
-		gpu_setfb(GFXDisplayBuffer[next_fb]);
 		next_fb = !next_fb;
 	}
 
